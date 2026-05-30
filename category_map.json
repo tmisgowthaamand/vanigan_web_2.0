@@ -1,0 +1,149 @@
+{
+  "Advertising": [
+    "Advertising Agency"
+  ],
+  "Advocate & Legal": [
+    "Legal Services"
+  ],
+  "Agriculture": [
+    "Agricultural Supplies",
+    "Mill",
+    "Seeds & Plants",
+    "Seeds & Trees"
+  ],
+  "Automobile": [
+    "Service Centre",
+    "Spare Parts",
+    "Vehicle Dealer"
+  ],
+  "B2B Services": [
+    "Traders & Distributors"
+  ],
+  "Banking & Finance": [
+    "Chit Fund",
+    "Finance"
+  ],
+  "Banquets & Event Halls": [
+    "Marriage Hall"
+  ],
+  "Bills & Recharge": [
+    "Recharge & Bills"
+  ],
+  "Caterers": [
+    "Event Catering"
+  ],
+  "Civil Contractors": [
+    "Building Contractor"
+  ],
+  "Construction Materials": [
+    "Building Materials",
+    "Granite & Tiles",
+    "Hardware Shop",
+    "Paint Shop",
+    "Timber & Wood"
+  ],
+  "Courier Services": [
+    "Courier Service"
+  ],
+  "Daily Needs": [
+    "General Store"
+  ],
+  "Digital & IT Products": [
+    "Digital Services"
+  ],
+  "Doctors": [
+    "Dental Clinic",
+    "Eye Care",
+    "General Physician"
+  ],
+  "Education": [
+    "Coaching Centre",
+    "School / College"
+  ],
+  "Electricals & Electronics": [
+    "CCTV & Security",
+    "Computer Shop",
+    "Electrical Shop",
+    "Electronics Showrooms",
+    "Mobile Shop"
+  ],
+  "Hire Services": [
+    "Rental Services"
+  ],
+  "Home Appliances": [
+    "Home Appliances"
+  ],
+  "Hospitals & Clinics": [
+    "Clinics",
+    "Hospitals"
+  ],
+  "Hotels & Restaurants": [
+    "Bakery",
+    "Food Shop",
+    "Hotel",
+    "Restaurant",
+    "Tea & Coffee Shop"
+  ],
+  "IT & Software": [
+    "Software Company"
+  ],
+  "Insurance": [
+    "Insurance Agent"
+  ],
+  "Jewellery": [
+    "Jewellery Shop"
+  ],
+  "Jobs": [
+    "Recruitment Agency"
+  ],
+  "Labs & Diagnostics": [
+    "Diagnostic Centre"
+  ],
+  "Organic Products": [
+    "Organic Store"
+  ],
+  "Packers & Movers": [
+    "Packers & Movers"
+  ],
+  "Pest Control": [
+    "Pest Control"
+  ],
+  "Printing Services": [
+    "Books & Stationery",
+    "Printing Shop"
+  ],
+  "Real Estate": [
+    "Property Dealer"
+  ],
+  "Religious": [
+    "Religious"
+  ],
+  "Repairs": [
+    "Repair Services"
+  ],
+  "Spa & Beauty": [
+    "Beauty Salon",
+    "Bridal Studio"
+  ],
+  "Sports": [
+    "Sports"
+  ],
+  "Textiles & Garments": [
+    "Readymade Garments",
+    "Saree & Textiles",
+    "Tailoring",
+    "Textiles"
+  ],
+  "Transport": [
+    "Goods Transport",
+    "Logistics",
+    "Taxi & Cab",
+    "Travel Agency"
+  ],
+  "Travel & Tourism": [
+    "Tour Operator"
+  ],
+  "Wedding Services": [
+    "Wedding Services"
+  ]
+}

@@ -1,0 +1,10 @@
+# Vanigan.org - Robots.txt
+# https://vanigan-web.vercel.app
+
+User-agent: *
+Allow: /
+Disallow: /my-business
+Disallow: /add-business
+
+# Sitemap location
+Sitemap: https://vanigan-web.vercel.app/sitemap.xml
