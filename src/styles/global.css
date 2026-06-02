@@ -1,3 +1,6 @@
+/* Type faces must be imported before everything else — @import rules
+   must precede all other statements (CSS spec). */
+@import url('https://fonts.googleapis.com/css2?family=Alumni+Sans+Pinstripe:ital@0;1&family=Alumni+Sans:wght@300;400;500;600;700&family=Albert+Sans:wght@400;500;600;700&family=Roboto+Mono:wght@400;500&display=swap');
 @import "tailwindcss";
 
 /* ════════════════════════════════════════════════════════════
@@ -7,9 +10,6 @@
    Backend logic, routing, data and branding are untouched —
    only the visual shell lives here.
    ════════════════════════════════════════════════════════════ */
-
-/* ── Type faces: geometric display + body + mono ── */
-@import url('https://fonts.googleapis.com/css2?family=Alumni+Sans+Pinstripe:ital@0;1&family=Alumni+Sans:wght@300;400;500;600;700&family=Albert+Sans:wght@400;500;600;700&family=Roboto+Mono:wght@400;500&display=swap');
 
 /* ════════════ Tailwind theme tokens (first-class utilities) ════════════
    Defining these here gives clean utilities like text-champagne, border-rule,
