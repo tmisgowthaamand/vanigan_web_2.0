@@ -68,7 +68,7 @@ const Footer = () => {
                         <input
                             type="email"
                             placeholder="Enter your email"
-                            className="ks-input md:w-[280px] h-[48px]!"
+                            className="ks-input flex-1 min-w-0 md:flex-none md:w-[280px] h-[48px]!"
                         />
                         <button className="ks-button ks-button-primary min-h-12! px-6! text-[14px]! shrink-0">
                             Subscribe
