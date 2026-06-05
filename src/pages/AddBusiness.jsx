@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import { businessService } from '../services/api';
 import { authService, webAuthService, session } from '../services/api';
@@ -27,6 +28,7 @@ const AddBusiness = () => {
   const [message, setMessage] = useState('');
   const [showPlatformSelector, setShowPlatformSelector] = useState(false);
   const [whatsappNumber, setWhatsappNumber] = useState('');
+  const [existingBusiness, setExistingBusiness] = useState(null);
 
   // If the owner arrived here from Login/Signup, prefill the verification phone
   // (either a bounced new-member phone, or their logged-in account phone).
@@ -101,6 +103,91 @@ const AddBusiness = () => {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
+  const normalizeMobile = (value) => (value || '').replace(/\D/g, '').slice(-10);
+
+  const getBusinessPhoneCandidates = () => {
+    const candidates = [
+      { label: 'Verification number', value: whatsappNumber },
+      { label: 'Primary number', value: formData.whatsappPrimary },
+      { label: 'Secondary number', value: formData.alternatePhone },
+    ]
+      .map(({ label, value }) => ({ label, phone: normalizeMobile(value) }))
+      .filter(({ phone }) => phone.length === 10);
+
+    return candidates.filter(
+      (candidate, index, list) => list.findIndex(item => item.phone === candidate.phone) === index
+    );
+  };
+
+  const findExistingBusinessPhone = async (phoneCandidates, onProgress) => {
+    for (const candidate of phoneCandidates) {
+      try {
+        const accountCheck = await webAuthService.checkPhone(candidate.phone);
+        if (accountCheck?.exists) {
+          const account = await webAuthService.me(candidate.phone).catch(() => null);
+          const linkedBusiness =
+            account?.business ||
+            (account?.user?.businessId ? { _id: account.user.businessId } : null);
+
+          if (linkedBusiness?._id) {
+            return { ...candidate, business: linkedBusiness };
+          }
+        }
+      } catch {
+        // If the account lookup is unavailable, continue with the public
+        // business directory scan below.
+      }
+
+      const matches = await businessService.getByPhone(
+        candidate.phone,
+        onProgress ? (progress) => onProgress(candidate, progress) : undefined
+      );
+      if (matches.length > 0) return { ...candidate, business: matches[0] };
+    }
+    return null;
+  };
+
+  const handleStartVerification = async () => {
+    const verificationPhone = normalizeMobile(whatsappNumber);
+    if (verificationPhone.length !== 10) {
+      setStatus('error');
+      setMessage('Please enter a valid 10-digit mobile number.');
+      return;
+    }
+
+    setExistingBusiness(null);
+    setStatus('loading');
+    setMessage('Checking this phone number in business records...');
+
+    try {
+      const existing = await findExistingBusinessPhone(
+        [{ label: 'Verification number', phone: verificationPhone }],
+        (_candidate, progress) => setMessage(`Checking this phone number in business records... ${progress}%`)
+      );
+      if (existing) {
+        setExistingBusiness(existing.business || null);
+        setStatus('error');
+        setMessage(`Your business already added successfully in this phone number: ${existing.phone}.`);
+        return;
+      }
+
+      setWhatsappNumber(verificationPhone);
+      setStatus('idle');
+      setMessage('');
+      setStep(2);
+    } catch {
+      setStatus('error');
+      setMessage('Could not check this phone number. Please try again.');
+    }
+  };
+
+  const handleVerificationSubmit = (e) => {
+    e.preventDefault();
+    if (status !== 'loading') {
+      handleStartVerification();
+    }
+  };
+
   const handleUseLocation = () => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(async (pos) => {
@@ -119,10 +206,45 @@ const AddBusiness = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setExistingBusiness(null);
     setStatus('loading');
-    setMessage('Submitting your registration...');
+    setMessage('Checking your business numbers...');
 
     try {
+      const rawPrimaryPhone = formData.whatsappPrimary.trim();
+      const rawSecondaryPhone = formData.alternatePhone.trim();
+      const primaryPhone = normalizeMobile(formData.whatsappPrimary);
+      const secondaryPhone = normalizeMobile(formData.alternatePhone);
+      const verificationPhone = normalizeMobile(formData.whatsappNo || whatsappNumber);
+
+      if (!rawPrimaryPhone || primaryPhone.length !== 10) {
+        setStatus('error');
+        setMessage('Please enter a valid 10-digit primary number.');
+        return;
+      }
+
+      if (rawSecondaryPhone && secondaryPhone.length !== 10) {
+        setStatus('error');
+        setMessage('Please enter a valid 10-digit secondary number.');
+        return;
+      }
+
+      if (secondaryPhone && primaryPhone === secondaryPhone) {
+        setStatus('error');
+        setMessage('Primary and secondary numbers cannot be the same.');
+        return;
+      }
+
+      const existing = await findExistingBusinessPhone(getBusinessPhoneCandidates());
+      if (existing) {
+        setExistingBusiness(existing.business || null);
+        setStatus('error');
+        setMessage(`Your business already added successfully in this phone number: ${existing.phone}.`);
+        return;
+      }
+
+      setMessage('Submitting your registration...');
+
       // Prepare FormData for multipart submission.
       // The backend (Multer) expects these exact file field names:
       //   coverImage     ← banner photo
@@ -146,6 +268,12 @@ const AddBusiness = () => {
           data.append(key, formData[key]);
         }
       });
+
+      data.set('whatsappNo', verificationPhone);
+      data.set('whatsappPrimary', primaryPhone);
+      data.set('alternatePhone', secondaryPhone);
+      data.set('phone', primaryPhone);
+      data.set('phone2', secondaryPhone);
 
       // Map single image uploads to the backend's expected field names.
       Object.entries(FILE_FIELD_MAP).forEach(([localKey, apiKey]) => {
@@ -388,7 +516,7 @@ const AddBusiness = () => {
                 </p>
               </div>
 
-              <div className="space-y-8 pt-2">
+              <form onSubmit={handleVerificationSubmit} className="space-y-8 pt-2">
                 <div className="space-y-4">
                   <div className="flex items-center gap-3 text-kinpaku">
                     <div className="w-8 h-8 bg-graphite rounded-lg flex items-center justify-center">
@@ -400,17 +528,54 @@ const AddBusiness = () => {
                     type="tel"
                     placeholder="Enter 10-digit mobile number"
                     value={whatsappNumber}
-                    onChange={(e) => setWhatsappNumber(e.target.value)}
+                    onChange={(e) => { setWhatsappNumber(e.target.value); setStatus('idle'); setMessage(''); setExistingBusiness(null); }}
                     className="w-full bg-lacquer-deep border-2 border-rule rounded-2xl px-5 sm:px-8 py-4 sm:py-6 outline-none focus:border-kinpaku/30 focus:bg-raised transition-all text-champagne text-xl font-bold placeholder:text-faint"
                   />
                 </div>
 
                 <div className="space-y-8">
+                  {status !== 'idle' && (
+                    <div className={`p-5 rounded-2xl border flex items-center gap-3 ${status === 'error' ? 'bg-raised border-warning/40 text-warning' : 'bg-lacquer-deep border-rule text-ink'}`}>
+                      {status === 'loading' && <Loader2 size={18} className="animate-spin text-kinpaku shrink-0" />}
+                      {status === 'error' && <AlertCircle size={18} className="shrink-0" />}
+                      <div className="flex-1">
+                        <p className="text-[12px] font-black uppercase tracking-wider leading-relaxed">{message}</p>
+                        {status === 'error' && existingBusiness?._id && (
+                          <div className="mt-4 flex flex-col sm:flex-row gap-3">
+                            <Link
+                              to={`/business/${existingBusiness._id}`}
+                              className="inline-flex items-center justify-center rounded-xl border border-warning/40 px-4 py-3 text-[11px] font-black uppercase tracking-widest text-warning hover:bg-warning/10 transition-colors"
+                            >
+                              View Existing Business
+                            </Link>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const cleanPhone = normalizeMobile(whatsappNumber);
+                                if (cleanPhone) {
+                                  localStorage.setItem('vanigan_owner_phone', cleanPhone);
+                                  sessionStorage.setItem('vanigan_owner_phone', cleanPhone);
+                                }
+                                sessionStorage.setItem('vanigan_owner_business', JSON.stringify(existingBusiness));
+                                localStorage.setItem('vanigan_owner_business', JSON.stringify(existingBusiness));
+                                window.location.href = '/my-business';
+                              }}
+                              className="inline-flex items-center justify-center rounded-xl bg-warning/10 px-4 py-3 text-[11px] font-black uppercase tracking-widest text-warning hover:bg-warning/20 transition-colors"
+                            >
+                              Go To My Business
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
                   <button
-                    onClick={() => whatsappNumber.length >= 10 && setStep(2)}
+                    type="submit"
+                    disabled={status === 'loading'}
                     className="w-full bg-kinpaku text-lacquer-deep py-5 sm:py-7 rounded-2xl text-[13px] sm:text-[15px] font-black uppercase tracking-[0.2em] sm:tracking-[0.35em] flex items-center justify-center gap-6 hover:bg-kinpaku-rich shadow-2xl shadow-[rgba(232,119,34,0.3)] hover:-translate-y-1 transition-all group"
                   >
-                    GET STARTED NOW <ArrowRight size={22} className="group-hover:translate-x-2 transition-transform duration-500" />
+                    {status === 'loading' ? <><Loader2 size={20} className="animate-spin" /> Checking...</> : <>GET STARTED NOW <ArrowRight size={22} className="group-hover:translate-x-2 transition-transform duration-500" /></>}
                   </button>
 
                   <div className="flex items-center gap-4 px-6 py-4 bg-graphite rounded-2xl border border-kinpaku/50">
@@ -420,7 +585,7 @@ const AddBusiness = () => {
                     </p>
                   </div>
                 </div>
-              </div>
+              </form>
             </div>
           </div>
         ) : (
@@ -433,7 +598,17 @@ const AddBusiness = () => {
                 {status === 'loading' && <div className="w-5 h-5 border-2 border-kinpaku border-t-transparent rounded-full animate-spin" />}
                 {status === 'success' && <CheckCircle size={20} />}
                 {status === 'error' && <AlertCircle size={20} />}
-                <p className="text-sm font-black uppercase tracking-wider">{message}</p>
+                <div className="flex-1">
+                  <p className="text-sm font-black uppercase tracking-wider">{message}</p>
+                  {status === 'error' && existingBusiness?._id && (
+                    <Link
+                      to={`/business/${existingBusiness._id}`}
+                      className="mt-4 inline-flex items-center justify-center rounded-xl border border-warning/40 px-4 py-3 text-[11px] font-black uppercase tracking-widest text-warning hover:bg-warning/10 transition-colors"
+                    >
+                      View Existing Business
+                    </Link>
+                  )}
+                </div>
               </div>
             )}
 
@@ -557,9 +732,12 @@ const AddBusiness = () => {
                   <input
                     name="whatsappPrimary"
                     value={formData.whatsappPrimary}
-                    onChange={handleChange}
+                    onChange={(e) => { handleChange(e); setStatus('idle'); setMessage(''); setExistingBusiness(null); }}
                     className="w-full bg-lacquer-deep border-2 border-rule rounded-2xl px-5 sm:px-8 py-4 sm:py-6 text-lg font-bold text-champagne shadow-sm focus:border-kinpaku focus:bg-raised transition-all placeholder:text-faint"
                     placeholder="9876543210"
+                    type="tel"
+                    inputMode="numeric"
+                    required
                   />
                 </div>
 
@@ -574,7 +752,7 @@ const AddBusiness = () => {
                   </div>
                   <div className="space-y-3">
                     <label className="text-[11px] font-black text-champagne uppercase tracking-widest pl-1">Alternate Mobile</label>
-                    <input name="alternatePhone" value={formData.alternatePhone} onChange={handleChange} className="form-input-light" placeholder="Second contact mobile" />
+                    <input name="alternatePhone" value={formData.alternatePhone} onChange={(e) => { handleChange(e); setStatus('idle'); setMessage(''); setExistingBusiness(null); }} className="form-input-light" placeholder="Second contact mobile" type="tel" inputMode="numeric" />
                   </div>
                   <div className="space-y-3">
                     <label className="text-[11px] font-black text-champagne uppercase tracking-widest pl-1">Official Email Address</label>

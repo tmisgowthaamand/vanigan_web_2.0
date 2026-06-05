@@ -1,12 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
-import PageHeader from '../components/PageHeader';
 import BusinessCard from '../components/BusinessCard';
 import { businessService } from '../services/api';
 import { districtAssemblies, districts as tnDistricts } from '../data/constituencies';
 import { categorySubMap } from '../data/subCategories';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Loader2, AlertCircle, Plus, X, LayoutGrid, ChevronDown, MapPin, ChevronLeft, ChevronRight, Star, ArrowRight, Sparkles, TrendingUp, CheckCircle, Building2 } from 'lucide-react';
+import { Search, Loader2, AlertCircle, ChevronDown, MapPin, ChevronLeft, ChevronRight, Star, Sparkles, TrendingUp, Building2 } from 'lucide-react';
+
+const ROTATING_WORDS = ["traders", "shops", "agencies", "partners"];
 
 const BusinessList = () => {
     const [searchParams, setSearchParams] = useSearchParams();
@@ -63,60 +64,72 @@ const BusinessList = () => {
         Object.entries(districtAssemblies).map(([d, assemblies]) => [d, ["All Assemblies", ...assemblies]])
     );
 
-    const [selectedCategory, setSelectedCategory] = useState(searchParams.get('category') || 'All Categories');
-    const [subCategory, setSubCategory] = useState('All Sub-Categories');
-    const [district, setDistrict] = useState('All Districts');
-    const [assembly, setAssembly] = useState('All Assemblies');
+    const selectedCategory = searchParams.get('category') || 'All Categories';
+    const subCategory = searchParams.get('subcategory') || searchParams.get('subCategory') || 'All Sub-Categories';
+    const district = searchParams.get('district') || 'All Districts';
+    const assembly = searchParams.get('assembly') || 'All Assemblies';
+    const currentPage = Math.max(1, Number(searchParams.get('page')) || 1);
+    const finalizedSearch = (searchParams.get('search') || '').trim();
     const [businesses, setBusinesses] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
-    const [currentPage, setCurrentPage] = useState(1);
-    const [searchTerm, setSearchTerm] = useState('');
-    const [finalizedSearch, setFinalizedSearch] = useState('');
+    const [searchTerm, setSearchTerm] = useState(finalizedSearch);
 
     useEffect(() => {
-        const categoryFromUrl = searchParams.get('category');
-        if (categoryFromUrl) {
-            setSelectedCategory(categoryFromUrl);
-        } else {
-            setSelectedCategory('All Categories');
-        }
-        const searchFromUrl = searchParams.get('search');
-        if (searchFromUrl) {
-            setSearchTerm(searchFromUrl);
-            setFinalizedSearch(searchFromUrl);
-        } else {
-            setSearchTerm('');
-            setFinalizedSearch('');
-        }
-    }, [searchParams]);
+        const term = searchTerm.trim();
+        if (term === finalizedSearch) return undefined;
+
+        const timer = setTimeout(() => {
+            const params = new URLSearchParams();
+            if (term) params.set('search', term);
+            params.set('page', '1');
+            setSearchParams(params);
+        }, 500);
+
+        return () => clearTimeout(timer);
+    }, [searchTerm, finalizedSearch, setSearchParams]);
 
     const handleSearch = () => {
-        const params = new URLSearchParams(searchParams);
-        if (searchTerm) {
-            params.set('search', searchTerm);
-            // When performing a new search from the hero, we often want to search all categories
-            params.delete('category');
-        } else {
-            params.delete('search');
+        const term = searchTerm.trim();
+        const params = new URLSearchParams();
+        if (term) {
+            params.set('search', term);
         }
         params.set('page', '1');
         setSearchParams(params);
-        setFinalizedSearch(searchTerm);
+        setSearchTerm(term);
     };
 
     const handleCategorySelect = (cat) => {
-        setSelectedCategory(cat);
-        setSubCategory('All Sub-Categories');
-        setDistrict('All Districts');
-        setCurrentPage(1); // Reset to page 1
         const params = new URLSearchParams(searchParams);
         if (cat === 'All Categories') {
             params.delete('category');
         } else {
             params.set('category', cat);
         }
+        params.delete('subcategory');
+        params.delete('subCategory');
+        params.delete('district');
+        params.delete('assembly');
         params.set('page', '1');
+        setSearchParams(params);
+    };
+
+    const updateFilterParam = (key, value, allValue) => {
+        const params = new URLSearchParams(searchParams);
+        if (!value || value === allValue) {
+            params.delete(key);
+            if (key === 'subcategory') params.delete('subCategory');
+        } else {
+            params.set(key, value);
+        }
+        params.set('page', '1');
+        setSearchParams(params);
+    };
+
+    const updatePage = (page) => {
+        const params = new URLSearchParams(searchParams);
+        params.set('page', String(Math.max(1, page)));
         setSearchParams(params);
     };
 
@@ -177,7 +190,6 @@ const BusinessList = () => {
 
     const uniqueDistricts = tamilNaduDistricts;
 
-    const ROTATING_WORDS = ["traders", "shops", "agencies", "partners"];
     const [wordIndex, setWordIndex] = useState(0);
 
     // Top trader categories by live DB volume (rank 1–10). Counts/percentages
@@ -255,17 +267,16 @@ const BusinessList = () => {
                                 initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}
                                 className="flex items-center gap-3 pt-4"
                             >
-                                <div className="flex-1 relative group max-w-sm">
+                                <form onSubmit={(event) => { event.preventDefault(); handleSearch(); }} className="flex-1 relative group max-w-sm">
                                     <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-faint group-focus-within:text-kinpaku transition-colors" size={20} />
                                     <input
                                         type="text"
                                         value={searchTerm}
                                         onChange={(e) => setSearchTerm(e.target.value)}
-                                        onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
                                         placeholder="I am looking for..."
                                         className="w-full border border-rule rounded-xl py-4 pl-12 pr-4 text-[15px] font-medium text-champagne outline-none focus:border-kinpaku/50 focus:ring-4 focus:ring-kinpaku/10 transition-all placeholder:text-faint shadow-sm"
                                     />
-                                </div>
+                                </form>
                                 <button
                                     onClick={handleSearch}
                                     className="bg-kinpaku text-white h-[54px] px-8 rounded-xl text-[15px] font-bold hover:bg-kinpaku-rich hover:shadow-lg hover:shadow-kinpaku/20 transition-all shrink-0 active:scale-95"
@@ -453,21 +464,31 @@ const BusinessList = () => {
                             {/* Filter Row */}
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                 <div className="relative">
-                                    <select value={subCategory} onChange={(e) => { setSubCategory(e.target.value); setCurrentPage(1); }}
+                                    <select value={subCategory} onChange={(e) => updateFilterParam('subcategory', e.target.value, 'All Sub-Categories')}
                                         className="w-full bg-raised border border-rule rounded-xl py-3.5 px-5 text-[14px] font-medium text-muted appearance-none outline-none focus:border-kinpaku/50 transition-all cursor-pointer shadow-sm">
                                         {uniqueSubCategories.map(sub => <option key={sub} value={sub}>{sub}</option>)}
                                     </select>
                                     <ChevronDown size={14} className="absolute right-4 top-1/2 -translate-y-1/2 text-faint pointer-events-none" />
                                 </div>
                                 <div className="relative">
-                                    <select value={district} onChange={(e) => { setDistrict(e.target.value); setAssembly('All Assemblies'); setCurrentPage(1); }}
+                                    <select value={district} onChange={(e) => {
+                                        const params = new URLSearchParams(searchParams);
+                                        if (e.target.value === 'All Districts') {
+                                            params.delete('district');
+                                        } else {
+                                            params.set('district', e.target.value);
+                                        }
+                                        params.delete('assembly');
+                                        params.set('page', '1');
+                                        setSearchParams(params);
+                                    }}
                                         className="w-full bg-raised border border-rule rounded-xl py-3.5 px-5 text-[14px] font-medium text-muted appearance-none outline-none focus:border-kinpaku/50 transition-all cursor-pointer shadow-sm">
                                         {uniqueDistricts.map(dst => <option key={dst} value={dst}>{dst}</option>)}
                                     </select>
                                     <MapPin size={14} className="absolute right-4 top-1/2 -translate-y-1/2 text-faint pointer-events-none" />
                                 </div>
                                 <div className="relative">
-                                    <select value={assembly} onChange={(e) => { setAssembly(e.target.value); setCurrentPage(1); }}
+                                    <select value={assembly} onChange={(e) => updateFilterParam('assembly', e.target.value, 'All Assemblies')}
                                         className="w-full bg-raised border border-rule rounded-xl py-3.5 px-5 text-[14px] font-medium text-muted appearance-none outline-none focus:border-kinpaku/50 transition-all cursor-pointer shadow-sm"
                                         disabled={district === 'All Districts'}>
                                         {(districtAssemblyMap[district] || ["All Assemblies"]).map(asm => <option key={asm} value={asm}>{asm}</option>)}
@@ -497,12 +518,12 @@ const BusinessList = () => {
 
                                     {/* Pagination */}
                                     <div className="flex items-center justify-center gap-4 pt-8">
-                                        <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}
+                                        <button onClick={() => updatePage(currentPage - 1)} disabled={currentPage === 1}
                                             className="w-10 h-10 rounded-lg border border-rule bg-raised flex items-center justify-center hover:bg-lacquer transition-all disabled:opacity-30 disabled:cursor-not-allowed text-champagne shadow-sm">
                                             <ChevronLeft size={18} />
                                         </button>
                                         <span className="text-[14px] font-semibold text-champagne bg-raised px-4 py-2 rounded-lg border border-rule shadow-sm">Page {currentPage}</span>
-                                        <button onClick={() => setCurrentPage(p => p + 1)} disabled={businesses.length < 12}
+                                        <button onClick={() => updatePage(currentPage + 1)} disabled={businesses.length < 12}
                                             className="w-10 h-10 rounded-lg border border-rule bg-raised flex items-center justify-center hover:bg-lacquer transition-all disabled:opacity-30 disabled:cursor-not-allowed text-champagne shadow-sm">
                                             <ChevronRight size={18} />
                                         </button>
@@ -511,7 +532,7 @@ const BusinessList = () => {
                             ) : (
                                 <div className="text-center py-20 bg-raised rounded-[20px] border border-rule shadow-sm">
                                     <p className="text-faint font-medium text-[15px]">No businesses found matching your criteria.</p>
-                                    <button onClick={() => { handleCategorySelect('All Categories'); setSearchTerm(''); setFinalizedSearch(''); }}
+                                    <button onClick={() => { setSearchParams(new URLSearchParams({ page: '1' })); setSearchTerm(''); }}
                                         className="mt-4 text-kinpaku font-semibold text-[14px] underline underline-offset-4 hover:text-kinpaku-rich transition-colors">Clear filters</button>
                                 </div>
                             )}

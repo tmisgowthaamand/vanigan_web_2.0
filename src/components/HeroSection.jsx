@@ -1,7 +1,33 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+
+const placeholders = ['How to start a business', 'Funding opportunities', 'Networking events', 'Legal advice', 'Marketing help'];
+
+const slides = [
+    {
+        image: 'https://images.pexels.com/photos/2379004/pexels-photo-2379004.jpeg?auto=compress&cs=tinysrgb&w=800',
+        bg: '#E87722',
+        quote: '"Vanigan has been monumental in starting my business."',
+        name: 'Junaid S.',
+        title: 'Founder of TechSolutions'
+    },
+    {
+        image: 'https://images.pexels.com/photos/1181690/pexels-photo-1181690.jpeg?auto=compress&cs=tinysrgb&w=800',
+        bg: '#2B7A78',
+        quote: '"The community support here is exactly what I needed to grow."',
+        name: 'Priya M.',
+        title: 'Co-founder of GreenLeaf'
+    },
+    {
+        image: 'https://images.pexels.com/photos/2182970/pexels-photo-2182970.jpeg?auto=compress&cs=tinysrgb&w=800',
+        bg: '#3D5A80',
+        quote: '"Resources provided by Vanigan are world-class and easy to follow."',
+        name: 'Anish K.',
+        title: 'Owner, CraftBrew Co.'
+    }
+];
 
 const HeroSection = () => {
     const navigate = useNavigate();
@@ -9,34 +35,13 @@ const HeroSection = () => {
     const [searchQuery, setSearchQuery] = useState('');
     const [placeholderIndex, setPlaceholderIndex] = useState(0);
 
-    const placeholders = ['How to start a business', 'Funding opportunities', 'Networking events', 'Legal advice', 'Marketing help'];
-
-    const slides = [
-        {
-            image: 'https://images.pexels.com/photos/2379004/pexels-photo-2379004.jpeg?auto=compress&cs=tinysrgb&w=800',
-            bg: '#E87722',
-            quote: '"Vanigan has been monumental in starting my business."',
-            name: 'Junaid S.',
-            title: 'Founder of TechSolutions'
-        },
-        {
-            image: 'https://images.pexels.com/photos/1181690/pexels-photo-1181690.jpeg?auto=compress&cs=tinysrgb&w=800',
-            bg: '#2B7A78',
-            quote: '"The community support here is exactly what I needed to grow."',
-            name: 'Priya M.',
-            title: 'Co-founder of GreenLeaf'
-        },
-        {
-            image: 'https://images.pexels.com/photos/2182970/pexels-photo-2182970.jpeg?auto=compress&cs=tinysrgb&w=800',
-            bg: '#3D5A80',
-            quote: '"Resources provided by Vanigan are world-class and easy to follow."',
-            name: 'Anish K.',
-            title: 'Owner, CraftBrew Co.'
-        }
-    ];
-
     const nextSlide = () => setCurrentSlide((p) => (p + 1) % slides.length);
     const prevSlide = () => setCurrentSlide((p) => (p - 1 + slides.length) % slides.length);
+    const handleSearch = (event) => {
+        event.preventDefault();
+        const term = searchQuery.trim();
+        navigate(term ? `/business-list?search=${encodeURIComponent(term)}` : '/business-list');
+    };
 
     useEffect(() => {
         const t = setInterval(nextSlide, 7000);
@@ -100,7 +105,7 @@ const HeroSection = () => {
                         >
                             <p className="ks-eyebrow mb-4">I am looking for...</p>
                             <div className="max-w-[500px]">
-                                <div className="flex items-center border border-rule rounded-[6px] overflow-hidden bg-lacquer-deep focus-within:border-rule-strong transition-all">
+                                <form onSubmit={handleSearch} className="flex items-center border border-rule rounded-[6px] overflow-hidden bg-lacquer-deep focus-within:border-rule-strong transition-all">
                                     <div className="pl-5 pr-3 text-faint">
                                         <Search size={22} />
                                     </div>
@@ -129,12 +134,12 @@ const HeroSection = () => {
                                         )}
                                     </div>
                                     <button
-                                        onClick={() => navigate(`/business-list?search=${searchQuery}`)}
+                                        type="submit"
                                         className="ks-button ks-button-primary shrink-0 min-h-[44px]! px-7! text-[15px]! mr-[5px]"
                                     >
                                         Search
                                     </button>
-                                </div>
+                                </form>
                             </div>
                         </motion.div>
                     </div>

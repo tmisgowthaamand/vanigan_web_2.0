@@ -15,13 +15,76 @@ const api = axios.create({
     baseURL: API_BASE_URL,
 });
 
+const businessPhoneFields = (business) => [
+    business.phone,
+    business.phone2,
+    business.whatsappNo,
+    business.landline,
+    business.alternatePhone,
+    business.whatsappPrimary,
+];
+
+const hasBusinessPhone = (business, phone) => (
+    businessPhoneFields(business)
+        .map(value => (value || '').replace(/\D/g, '').slice(-10))
+        .some(value => value === phone)
+);
+
+const normalizeSearchText = (value) => (
+    String(value || '')
+        .toLowerCase()
+        .normalize('NFKD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9]+/g, ' ')
+        .trim()
+);
+
+const businessSearchText = (business) => normalizeSearchText([
+    business.name,
+    business.description,
+    business.category,
+    business.subCategory,
+    business.district,
+    business.assembly,
+    business.address,
+    business.landmark,
+    business.listingCode,
+    business.phone,
+    business.phone2,
+].filter(Boolean).join(' '));
+
+const rankBusinessSearchMatch = (business, rawSearch) => {
+    const query = normalizeSearchText(rawSearch);
+    const text = businessSearchText(business);
+    if (!query || !text) return 0;
+
+    const words = query.split(/\s+/).filter(Boolean);
+    if (text.includes(query)) return 100;
+    if (words.every(word => text.includes(word))) return 80;
+
+    const prefixMatches = words.filter(word => word.length >= 4 && text.includes(word.slice(0, 4))).length;
+    if (prefixMatches === words.length && prefixMatches > 0) return 45;
+    if (prefixMatches > 0) return 25;
+
+    return 0;
+};
+
+const getSearchFallbackSeeds = (rawSearch) => {
+    const words = normalizeSearchText(rawSearch).split(/\s+/).filter(word => word.length >= 3);
+    return [...new Set(words.flatMap(word => [
+        word,
+        word.length >= 4 ? word.slice(0, 4) : '',
+        word.length >= 3 ? word.slice(0, 3) : '',
+    ]).filter(Boolean))];
+};
+
 export const businessService = {
     // Get all businesses
     getAll: async (filters = {}) => {
         try {
             const params = new URLSearchParams();
             if (filters.category) params.append('category', filters.category);
-            if (filters.subCategory) params.append('subCategory', filters.subCategory);
+            if (filters.subCategory) params.append('subcategory', filters.subCategory);
             if (filters.district) params.append('district', filters.district);
             if (filters.assembly) params.append('assembly', filters.assembly);
             if (filters.search) params.append('search', filters.search);
@@ -29,6 +92,42 @@ export const businessService = {
             params.append('limit', '12'); // Perfect for 3-col grid
 
             const response = await api.get(`/api/public/businesses?${params.toString()}`);
+            const list = response.data?.businesses || [];
+            const needsFallback = filters.search && list.length === 0 && Number(filters.page || 1) === 1;
+            if (!needsFallback) return response.data;
+
+            const fallbackParams = new URLSearchParams();
+            if (filters.category) fallbackParams.append('category', filters.category);
+            if (filters.subCategory) fallbackParams.append('subcategory', filters.subCategory);
+            if (filters.district) fallbackParams.append('district', filters.district);
+            if (filters.assembly) fallbackParams.append('assembly', filters.assembly);
+            fallbackParams.append('limit', '60');
+            fallbackParams.append('page', '1');
+
+            for (const seed of getSearchFallbackSeeds(filters.search)) {
+                fallbackParams.set('search', seed);
+                const fallbackResponse = await api.get(`/api/public/businesses?${fallbackParams.toString()}`);
+                const ranked = (fallbackResponse.data?.businesses || [])
+                    .map(business => ({
+                        business,
+                        score: rankBusinessSearchMatch(business, filters.search),
+                    }))
+                    .filter(item => item.score > 0)
+                    .sort((a, b) => b.score - a.score)
+                    .map(item => item.business);
+
+                if (ranked.length > 0) {
+                    return {
+                        ...fallbackResponse.data,
+                        businesses: ranked.slice(0, 12),
+                        total: ranked.length,
+                        page: 1,
+                        limit: 12,
+                        fuzzy: true,
+                    };
+                }
+            }
+
             return response.data;
         } catch (error) {
             console.error('Error fetching businesses:', error);
@@ -73,10 +172,7 @@ export const businessService = {
 
             // Check first page results immediately
             const firstPageMatches = (initial.data.businesses || []).filter(b => {
-                const bPhone = (b.phone || '').replace(/\D/g, '').slice(-10);
-                const bPhone2 = (b.phone2 || '').replace(/\D/g, '').slice(-10);
-                const bWhatsapp = (b.whatsappNo || '').replace(/\D/g, '').slice(-10);
-                return bPhone === phone || bPhone2 === phone || bWhatsapp === phone;
+                return hasBusinessPhone(b, phone);
             });
             if (firstPageMatches.length > 0) {
                 allMatches = [...firstPageMatches];
@@ -99,11 +195,7 @@ export const businessService = {
                 for (const res of results) {
                     const list = res.data.businesses || [];
                     const matches = list.filter(b => {
-                        const bPhone = (b.phone || '').replace(/\D/g, '').slice(-10);
-                        const bPhone2 = (b.phone2 || '').replace(/\D/g, '').slice(-10);
-                        const bWhatsapp = (b.whatsappNo || '').replace(/\D/g, '').slice(-10);
-                        const bLandline = (b.landline || '').replace(/\D/g, '').slice(-10);
-                        return bPhone === phone || bPhone2 === phone || bWhatsapp === phone || bLandline === phone;
+                        return hasBusinessPhone(b, phone);
                     });
                     if (matches.length > 0) allMatches = [...allMatches, ...matches];
                 }
