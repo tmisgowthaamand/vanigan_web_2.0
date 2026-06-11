@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import Navbar from '../components/Navbar';
+import { motion } from 'framer-motion';
 import { businessService } from '../services/api';
 import { authService, webAuthService, session } from '../services/api';
 import { districtAssemblies, districts as tnDistricts } from '../data/constituencies';
@@ -28,6 +29,10 @@ const AddBusiness = () => {
   const [showPlatformSelector, setShowPlatformSelector] = useState(false);
   const [whatsappNumber, setWhatsappNumber] = useState('');
 
+  // State for existing business detection
+  const [existingBusiness, setExistingBusiness] = useState(null);
+  const [checkingExisting, setCheckingExisting] = useState(false);
+
   // If the owner arrived here from Login/Signup, prefill the verification phone
   // (either a bounced new-member phone, or their logged-in account phone).
   useEffect(() => {
@@ -40,6 +45,31 @@ const AddBusiness = () => {
       setWhatsappNumber(sessionPhone);
     }
   }, []);
+
+  // Check if the phone number already has a business listing
+  useEffect(() => {
+    let active = true;
+    if (whatsappNumber.length === 10) {
+      (async () => {
+        setCheckingExisting(true);
+        try {
+          const matches = await businessService.getByPhone(whatsappNumber, null, { allowSlowFallback: false });
+          if (active && matches && matches.length > 0) {
+            setExistingBusiness(matches[0]);
+          } else {
+            setExistingBusiness(null);
+          }
+        } catch {
+          setExistingBusiness(null);
+        } finally {
+          if (active) setCheckingExisting(false);
+        }
+      })();
+    } else {
+      setExistingBusiness(null);
+    }
+    return () => { active = false; };
+  }, [whatsappNumber]);
 
   // Post-registration PIN setup (secures the owner account for My Business login)
   const [pin, setPin] = useState('');
@@ -223,7 +253,7 @@ const AddBusiness = () => {
               const verify = await authService.verifyPin(ownerPhone, pin);
               const bizId = verify?._id || verify?.business?._id;
               if (bizId) {
-                await webAuthService.linkBusiness(ownerPhone, bizId).catch(() => {});
+                await webAuthService.linkBusiness(ownerPhone, bizId).catch(() => { });
                 const refreshed = await webAuthService.me(ownerPhone).catch(() => null);
                 if (refreshed?.user) auth = refreshed;
                 else auth = { ...me, business: verify?._id ? verify : verify?.business };
@@ -396,30 +426,62 @@ const AddBusiness = () => {
                     </div>
                     <label className="text-[11px] font-black uppercase tracking-widest">Official WhatsApp Number</label>
                   </div>
-                  <input
-                    type="tel"
-                    placeholder="Enter 10-digit mobile number"
-                    value={whatsappNumber}
-                    onChange={(e) => setWhatsappNumber(e.target.value)}
-                    className="w-full bg-lacquer-deep border-2 border-rule rounded-2xl px-5 sm:px-8 py-4 sm:py-6 outline-none focus:border-kinpaku/30 focus:bg-raised transition-all text-champagne text-xl font-bold placeholder:text-faint"
-                  />
-                </div>
-
-                <div className="space-y-8">
-                  <button
-                    onClick={() => whatsappNumber.length >= 10 && setStep(2)}
-                    className="w-full bg-kinpaku text-lacquer-deep py-5 sm:py-7 rounded-2xl text-[13px] sm:text-[15px] font-black uppercase tracking-[0.2em] sm:tracking-[0.35em] flex items-center justify-center gap-6 hover:bg-kinpaku-rich shadow-2xl shadow-[rgba(232,119,34,0.3)] hover:-translate-y-1 transition-all group"
-                  >
-                    GET STARTED NOW <ArrowRight size={22} className="group-hover:translate-x-2 transition-transform duration-500" />
-                  </button>
-
-                  <div className="flex items-center gap-4 px-6 py-4 bg-graphite rounded-2xl border border-kinpaku/50">
-                    <CheckCircle className="text-kinpaku shrink-0" size={18} />
-                    <p className="text-muted text-[11px] font-bold uppercase tracking-tight leading-relaxed">
-                      Your form data will be saved automatically in a new secure session.
-                    </p>
+                  <div className="relative">
+                    <input
+                      type="tel"
+                      placeholder="Enter 10-digit mobile number"
+                      value={whatsappNumber}
+                      onChange={(e) => setWhatsappNumber(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                      className="w-full bg-lacquer-deep border-2 border-rule rounded-2xl px-5 sm:px-8 py-4 sm:py-6 outline-none focus:border-kinpaku/30 focus:bg-raised transition-all text-champagne text-xl font-bold placeholder:text-faint"
+                    />
+                    {checkingExisting && (
+                      <div className="absolute right-4 top-1/2 -translate-y-1/2">
+                        <Loader2 size={20} className="animate-spin text-kinpaku" />
+                      </div>
+                    )}
                   </div>
                 </div>
+
+                {existingBusiness ? (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="p-6 bg-graphite rounded-2xl border border-kinpaku/40 space-y-4"
+                  >
+                    <div className="flex items-start gap-4">
+                      <div className="w-12 h-12 bg-raised rounded-xl flex items-center justify-center text-kinpaku">
+                        <CheckCircle size={24} />
+                      </div>
+                      <div>
+                        <h4 className="text-champagne font-bold">Business Already Registered</h4>
+                        <p className="text-muted text-xs font-medium">"{existingBusiness.name}" is already listed with this number.</p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => window.location.href = '/my-business'}
+                      className="w-full bg-kinpaku text-lacquer-deep py-4 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-kinpaku-rich transition-all"
+                    >
+                      Go to My Business
+                    </button>
+                  </motion.div>
+                ) : (
+                  <div className="space-y-8">
+                    <button
+                      onClick={() => whatsappNumber.length >= 10 && setStep(2)}
+                      disabled={checkingExisting}
+                      className="w-full bg-kinpaku text-lacquer-deep py-5 sm:py-7 rounded-2xl text-[13px] sm:text-[15px] font-black uppercase tracking-[0.2em] sm:tracking-[0.35em] flex items-center justify-center gap-6 hover:bg-kinpaku-rich shadow-2xl shadow-[rgba(232,119,34,0.3)] hover:-translate-y-1 transition-all group disabled:opacity-50"
+                    >
+                      {checkingExisting ? 'CHECKING...' : <>GET STARTED NOW <ArrowRight size={22} className="group-hover:translate-x-2 transition-transform duration-500" /></>}
+                    </button>
+
+                    <div className="flex items-center gap-4 px-6 py-4 bg-graphite rounded-2xl border border-kinpaku/50">
+                      <CheckCircle className="text-kinpaku shrink-0" size={18} />
+                      <p className="text-muted text-[11px] font-bold uppercase tracking-tight leading-relaxed">
+                        Your form data will be saved automatically in a new secure session.
+                      </p>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
